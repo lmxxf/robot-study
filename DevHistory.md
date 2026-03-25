@@ -60,5 +60,43 @@ python3 -m lerobot.scripts.lerobot_eval --policy.path=/workspace/models/diffusio
 4. **huggingface-hub 版本冲突**：lerobot 装了 1.7.2，transformers 要 <1.0
    - 解法：`pip install transformers -U`
 
-5. **模型格式需要迁移**：预训练模型缺 `policy_preprocessor.json`
-   - 解法（待执行）：`python3 -m lerobot.processor.migrate_policy_normalization --pretrained-path /workspace/models/diffusion_pusht`
+5. **模型格式需要迁移**：预训练模型缺 `policy_preprocessor.json`（lerobot 0.5.0 新增 processor 格式）
+   - 解法：`python3 -m lerobot.processor.migrate_policy_normalization --pretrained-path /workspace/models/diffusion_pusht`
+   - 迁移后模型保存在 `/workspace/models/diffusion_pusht_migrated`
+   - 迁移最后一步联网验证 YAML 会失败（容器没外网），不影响使用
+
+---
+
+## 2026-03-26 Push-T Demo 跑通
+
+### 结果
+
+- **成功率 60%**（10 局中 6 局成功把 T 形积木推到目标位置）
+- **耗时 71 秒**（GPU，每局约 7 秒）
+- 视频输出：`outputs/eval/pusht_demo/videos/pusht_0/eval_episode_*.mp4`
+
+### 这是在干什么
+
+1. MuJoCo 造了一个虚拟桌面，上面有 T 形积木和一个圆形"手指"
+2. Diffusion Policy（扩散策略）是"大脑"——看画面 + 手指位置，输出"手指往哪移"
+3. eval = 让这个大脑跑 10 局考试，记录成功率
+4. 模型是别人用**模仿学习**训好的：人类先用鼠标示范推积木，录数据，模型从中学策略
+
+**一句话：请一个学过推积木的 AI 来考试，考了 60 分。**
+
+### 命令记录
+
+```bash
+# 迁移模型格式（lerobot 0.5.0 要求）
+python3 -m lerobot.processor.migrate_policy_normalization --pretrained-path /workspace/models/diffusion_pusht
+
+# 用迁移后的模型跑 eval
+export MUJOCO_GL=egl
+python3 -m lerobot.scripts.lerobot_eval --policy.path=/workspace/models/diffusion_pusht_migrated --env.type=pusht --env.task=PushT-v0 --eval.n_episodes=10 --eval.batch_size=10 --output_dir=outputs/eval/pusht_demo
+```
+
+### 看视频
+
+容器的 `/workspace` 映射到宿主机 `/home/lmxxf/work`，视频在：
+- 宿主机：`~/work/outputs/eval/pusht_demo/videos/pusht_0/`
+- Windows SSHFS 映射后直接在资源管理器里双击 mp4 看
